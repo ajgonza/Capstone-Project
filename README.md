@@ -17,7 +17,7 @@ The modeling notebook [link to notebook here]() presents the machine learning pi
 
 ## External Data
 
-The project uses data from Yelp and the United States Census Bureau. The Yelp data was obtained using the Yelp API, and the Census data was obtained from the Census website.this is found on [link to notebook here](Modeling-Assignment-Using-H2O-AutoML_Final_Stephen_Smart.html)
+The project uses data from the United States Census Bureau provided via the [tidycensus](https://walker-data.com/tidycensus/) package. The heatmap displaying the 10 most important variables on TOTAL_PROFIT can be found [here](census_var_imp.png). Please refer to the presentation for variable definitions.
 
 ## Slides Presentation
 [link to notebook here](Customer_success_slides.pdf)
