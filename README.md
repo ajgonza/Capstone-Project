@@ -1,5 +1,9 @@
 # Customer success
 By: 
+[Addison Faber](https://github.com/addyb0y) \
+[Stephen Smart](https://github.com/stephenpsmart)\
+[Brian Bombasi](https://github.com/bombasibrian)\
+[Alvaro Gonzalez](https://github.com/ajgonza)
 
 Swire Coca-Cola is seeking to improve its ability to predict the success of new restaurants in its market. To achieve this goal, we will analyze census data, consumer reviews, customer attributes, and Swire's sales to these customers. The data will be used to build a predictive model that can estimate the success of new customers based on historical results. The project will deliver a predictive model, a report on the methodology and results, a software implementation of the model, training and support for stakeholders on how to use and interpret the results, and a live presentation to showcase the findings and explain the methodology and results. 
 
