@@ -1,5 +1,5 @@
 # Customer success
-By: Link the profiles of github
+By: 
 
 Swire Coca-Cola is seeking to improve its ability to predict the success of new restaurants in its market. To achieve this goal, we will analyze census data, consumer reviews, customer attributes, and Swire's sales to these customers. The data will be used to build a predictive model that can estimate the success of new customers based on historical results. The project will deliver a predictive model, a report on the methodology and results, a software implementation of the model, training and support for stakeholders on how to use and interpret the results, and a live presentation to showcase the findings and explain the methodology and results. 
 
@@ -13,7 +13,7 @@ The EDA notebook [link to notebook here](EDA_Swire_coca_cola.html) explores the 
 
 ## Modeling
 
-The modeling notebook [link to notebook here]() presents the machine learning pipeline used to train and evaluate the model. The pipeline includes data preprocessing, feature engineering, model selection, hyperparameter tuning, and evaluation metrics. The notebook also discusses the performance of the model and provides recommendations for improving the model.
+The modeling notebook [link to notebook here](Modeling_Alvaro_Gonzalez.html) or [here](https://ajgonza.github.io/Capstone-Project/)presents the machine learning pipeline used to train and evaluate the model. The pipeline includes data preprocessing, feature engineering, model selection, hyperparameter tuning, and evaluation metrics. The notebook also discusses the performance of the model and provides recommendations for improving the model.
 
 ## External Data
 
