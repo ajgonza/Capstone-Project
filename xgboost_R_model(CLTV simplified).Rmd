@@ -1,0 +1,178 @@
+---
+title: "prdataect_xgboost"
+author: "addison_farber"
+date: "2023-03-31"
+output: html_document
+---
+
+```{r}
+library(xgboost)
+library(caret)
+library(rsample)
+library(magrittr)
+library(yardstick)
+library(workflows)
+
+```
+
+
+```{r}
+# Load the data
+df <- read.csv("complexModelDF.csv")
+str(df)
+```
+
+```{r}
+#covariance <- cor(df[,c(6:10)])
+#covariance <-round(covariance, digits = 2)
+#covariance
+```
+
+# Dummify the categorical variables
+```{r}
+# Create a formula for the dummyVars function
+formula <- as.formula("cust_lifetime_value ~ .")
+
+# Create the dummy variables
+dummy <- dummyVars(formula, data = df)
+
+# Transform the data using the dummy variables
+df_transformed <- predict(dummy, newdata = df)
+
+# Check the class of df_transformed
+class(df_transformed)
+
+# Convert df_transformed to a data frame if necessary
+if (!is.data.frame(df_transformed)) {
+  df_transformed <- as.data.frame(df_transformed)
+}
+
+```
+
+# Add customer lifetime value back into the dataframe
+```{r}
+# Create two dataframes
+# Add the C column from df2 to df1
+df_transformed <- cbind(df_transformed, df$cust_lifetime_value)
+# add customer lifetime value back into the dataframe
+names(df_transformed)[98] <- "customer_lifetime_value"
+
+str(df_transformed)
+```
+
+# setup xgbosot model for regression
+```{r}
+# split data fro this model @ 70/30 as split for logistic model
+set.seed(1234)
+data_testtrn <- initial_split(df_transformed, prop = 0.8,
+                                  strata = customer_lifetime_value)
+data_train <- training(data_testtrn)
+data_test  <- testing(data_testtrn)
+
+xgb_spec <- boost_tree(
+  trees = 100,
+  tree_depth = tune(), min_n = tune(),
+  loss_reduction = tune(),                     ## first three: model complexity
+  sample_size = tune(), mtry = tune(),         ## randomness
+  learn_rate = tune(),                         ## step size
+) %>%
+  set_engine("xgboost") %>%
+  set_mode("regression")
+
+xgb_spec
+```
+
+
+# set hyperparameters
+
+```{r}
+
+### Setup possible Hyperparameter values
+xgb_grid <- grid_latin_hypercube(
+  tree_depth(),
+  min_n(),
+  loss_reduction(),
+  sample_size = sample_prop(),
+  finalize(mtry(), data_train),
+  learn_rate(),
+  size = 30
+)
+
+xgb_grid
+```
+
+# create cross validation 
+
+```{r}
+### Put the model specification into a workflow
+xgb_wf <- workflow() %>%
+  add_formula(customer_lifetime_value ~ .) %>%
+  add_model(xgb_spec)
+
+xgb_wf
+
+### Create cross-validation for tuning model
+set.seed(1234)
+vb_folds <- vfold_cv(data_train, strata = customer_lifetime_value)
+
+
+```
+
+# Tune the model
+```{r}
+### Tune the model
+doParallel::registerDoParallel()
+
+set.seed(1234)
+xgb_res <- tune_grid(
+  xgb_wf,
+  resamples = vb_folds,
+  grid = xgb_grid,
+  control = control_grid(save_pred = TRUE)
+)
+
+### Explore Metrics
+collect_metrics(xgb_res)
+```
+
+```{r}
+ ### Determine the best performing parameters
+#show_best(xgb_res, "roc_auc")
+#best_auc <- select_best(xgb_res, "roc_auc")
+#best_auc
+
+### Tune the optimal model using "best_auc"
+final_xgb <- finalize_workflow(
+  xgb_wf,
+  best_auc
+)
+
+final_xgb
+```
+
+
+```{r}
+### Plot the most important parameters
+
+### We can Clearly see the importance of the Parameters
+
+final_xgb %>%
+  fit(data = data_train) %>%
+  extract_fit_parsnip() %>%
+  vip(geom = "point")
+
+### Evaluate our model one last time on the testing set
+final_res <- last_fit(final_xgb, data_testtrn)
+
+# Final Evaluation Metrics
+collect_metrics(final_res, summarize = TRUE)
+```
+
+
+
+
+
+
+
+
+
