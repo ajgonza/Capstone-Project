@@ -9,15 +9,14 @@ Swire Coca-Cola is seeking to improve its ability to predict the success of new 
 
 ## Exploratory Data Analysis (EDA)
 
-The EDA notebook [link to notebook here](Capstone-Project/EDA_Swire_coca_cola.html) explores the dataset and provides insights into the distribution of the features, the correlation between the features, and the target variable. The notebook also includes visualizations to help understand the data.
+The EDA notebook [link to notebook here](EDA_Swire_coca_cola.html) explores the dataset and provides insights into the distribution of the features, the correlation between the features, and the target variable. The notebook also includes visualizations to help understand the data.
 
 ## Modeling
 
-The modeling notebook [link to notebook here](Capstone-Project/Modeling Alvaro_Gonzalez.html) presents the machine learning pipeline used to train and evaluate the model. The pipeline includes data preprocessing, feature engineering, model selection, hyperparameter tuning, and evaluation metrics. The notebook also discusses the performance of the model and provides recommendations for improving the model.
+The modeling notebook [link to notebook here](Modeling Alvaro_Gonzalez.html) presents the machine learning pipeline used to train and evaluate the model. The pipeline includes data preprocessing, feature engineering, model selection, hyperparameter tuning, and evaluation metrics. The notebook also discusses the performance of the model and provides recommendations for improving the model.
 
 ##External Data
-The project uses data from Yelp and the United States Census Bureau. The Yelp data was obtained using the Yelp API, and the Census data was obtained from the Census website.this is found on (Capstone-Project
-/Modeling-Assignment-Using-H2O-AutoML_Final - Stephen Smart.html)
+The project uses data from Yelp and the United States Census Bureau. The Yelp data was obtained using the Yelp API, and the Census data was obtained from the Census website.this is found on [link to notebook here] (Modeling-Assignment-Using-H2O-AutoML_Final - Stephen Smart.html)
 
 ## Conclusion
 
