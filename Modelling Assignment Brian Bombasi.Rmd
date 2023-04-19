@@ -1,0 +1,388 @@
+---
+title: "Modelling"
+author: "Brian Bombasi"
+date: "3/31/2023"
+output: 
+  html_document:
+    number_sections: yes
+    toc: yes
+    fig_width: 15
+    fig_height: 10
+editor_options: 
+  chunk_output_type: console
+---
+# The Business Problem
+Swire Coca-Cola wants to predict the profitability and success of new local B2B restaurants and the profitability and risk factor of current customers(quick service, restaurants, retails and etc) to make informed decisions on pricing and funding. Our team will use historical data and machine learning techniques to build a predictive model that identifies profitable restaurant types and how long it takes for both new and old customers to become profitable.
+
+The project will provide Swire Coca-Cola with insight on their current market, demands for each product and different customer segments.Our team also hope to provide Swire Coca-Cola with findings regarding customer profitability and what factors contribute towards a customer’s success and which reasons create risk for Swire.
+
+# Analytical Problems and Objective
+To create a predictive model that would highlight key indicators of success for Swire’s customers(b2b businesses and etc). This would help Swire identify and target potentially successful businesses and create a long lasting partnership. We hope that this would also identify key aspects of a risky businesses.
+
+We also want to deliver a model that would predict profitability (PROFITABLE) or TOTAL_PROFIT (target variable) based on discounts given and various other variables. By doing so we hope to show how different variables can affect a customers(both successful and risky ventures) business profitability in the long run.
+
+In this project I focused on TOTAL_PROFITS and a binary variable called PROFITABLE. Since most of swire's customers become profitable over a period of time, I made sure to balance profitable and non profitable customers by using the median as the separator for profitable and non profitable. Anything below the median of the total profit will be considered non profitable. I switched between PROFITABLE and TOTAL_PROFIT as the main target variable to see which variables affect a customer’s profitability. I ran an xgboost model, Linear Regression, Random Forest and a multiple regression analysis to see how TOTAL_PROFIT or PROFITABLE is affected.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(C50)
+library(scatterplot3d)
+library(caret)
+library(rminer)
+library(rmarkdown)
+library(tictoc) 
+tic()
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(rsample)
+library(glmnet)
+library(pROC)
+library(recipes)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(tidymodels)
+library(tidyverse)
+library(parsnip)
+library(recipes)
+```
+
+# Data Preparation
+The data is created by our team, it comprises of Sales and Customer Data. We took the excel sheets and uploaded them into a database where we were able to join the two files based on CUSTOMER_NUMBER_BLINDED. We also created new columns like ACTIVE which identifies if a customer has been actively purchasing products in the last 3 months. We made the assumption that 3 months is the threshold whether a customer can be considered active or not active.
+
+years_diff is the max posting date - the min posting date. Longevity is the max posting date - on boarding date CLVT stands for customer life time value
+
+As shown below I have create the PROFITABLE column which identifies a customer as profitable if they are above the median of total_profit
+
+I have dropped several columns as they were not needed for the Analysis.
+
+Any rows containing NAs were dropped
+```{r}
+df_team <- read.csv(file = "customer_features.csv", stringsAsFactors = TRUE)
+df1 <- read.csv(file = "Customer.csv" , stringsAsFactors = TRUE)
+merged <- merge(df1, df_team, by="CUSTOMER_NUMBER_BLINDED")
+
+#Profitable logic
+# A profitable business is considered profitable if its above the mean.
+mean(merged$TOTAL_PROFIT)
+median(merged$TOTAL_PROFIT)
+merged$PROFITABLE <- ifelse(merged$TOTAL_PROFIT > 1945.76, 1, 0)
+merged$PROFITABLE <- as.factor(merged$PROFITABLE)
+
+df <- subset(merged, select = c("UNIQUE_PRODUCTS", "EXPECTED_TRANS_YEAR", "years_diff", "TMRR_MAX", "longetivity", "PROFITABLE"))
+df2 <- subset(merged, select = c("ACTIVE", "UNIQUE_PRODUCTS", "EXPECTED_TRANS_YEAR", "years_diff", "TMRR_MAX", "longetivity", "PROFITABLE"))
+
+# Check for missing values
+sum(is.na(df)) # check the count of missing values
+getwd()
+# Remove missing values
+df <- df %>% drop_na()
+str(df)
+```
+
+# Data Exploration:
+I wanted to showcase how balanced profitable is.
+```{r}
+# Create a bar plot of profitable customers
+ggplot(df, aes(x=PROFITABLE, fill=PROFITABLE)) +
+  geom_bar()
+
+# Create a bar plot of active customers
+ggplot(df2, aes(x=ACTIVE, fill=ACTIVE)) +
+  geom_bar()
+
+```
+
+# Candidate models
+List the models you considered: I considered various models for my analysis, including regression models such as linear and multiple regression to investigate the relationship between my target variables TOTAL_PROFIT and PROFITABLE and the various dependent variables. However, since my dataset also contained categorical data, I also explored classification models to predict whether a customer will become a profitable customer to Swire.
+
+One model I used was the Random Forest Model due to its ability to perform both classification and regression tasks, and its features for outlier detection and feature selection. I also opted to use xgboost due to its ability to handle high dimensional data and built and trained a regression model using this algorithm. Finally, I evaluated the performance of both models on a test set for both target variables.
+
+# Random Forest Model
+I wanted to use this model to predict whether the customer will be profitable or not based on several predicting methods.Unfortunately the model came out as too overfitted with an accuracy score of 94%. I tried to use cross validation, taking out predictor variables and simpify the model to lower the accuracy but it only stayed around 90%. I dont believe that this will be a useful model.
+The model takes around 20 seconds to run.
+```{r}
+set.seed(123)
+trainIndex <- createDataPartition(df$PROFITABLE, p = .7, 
+                                   list = FALSE, 
+                                   times = 1)
+trainData <- df[ trainIndex,]
+testData <- df[-trainIndex,]
+```
+
+```{r}
+library(randomForest)
+
+set.seed(123)
+trainIndex <- createDataPartition(df$PROFITABLE, p = .7, 
+                                   list = FALSE, 
+                                   times = 1)
+trainData <- df[ trainIndex,]
+testData <- df[-trainIndex,]
+
+ctrl <- trainControl(method = "cv",  # Use cross-validation
+                     number = 20)   # 10 folds
+
+rf_model <- randomForest(PROFITABLE ~ ., data = trainData, 
+                          ntree = 100, mtry = 3,
+                          importance = TRUE,
+                          nodesize = 5)
+
+rf_pred <- predict(rf_model, newdata = testData)
+
+```
+
+```{r}
+confusionMatrix(rf_pred, testData$PROFITABLE)
+
+# Output:
+# Confusion Matrix and Statistics
+# 
+#           Reference
+# Prediction     0     1
+#          0  4367   502
+#          1  1803  1359
+#                                           
+#                Accuracy : 0.7144          
+#                  95% CI : (0.7035, 0.725)
+#     No Information Rate : 0.5423          
+#     P-Value [Acc > NIR] : < 2.2e-16       
+#                                           
+#                   Kappa : 0.3102          
+#                                           
+#  Mcnemar's Test P-Value : < 2.2e-16       
+#                                           
+#             Sensitivity : 0.8914          
+#             Specificity : 0.7292          
+#          Pos Pred Value : 0.8977          
+#          Neg Pred Value : 0.6549          
+#              Prevalence : 0.5423          
+#          Detection Rate : 0.4834          
+#    Detection Prevalence : 0.5391          
+#       Balanced Accuracy : 0.8103          
+#                                           
+#        'Positive' Class : 1               
+# 
+```
+```{r}
+# Calculate feature importance
+imp <- importance(rf_model)
+
+# Plot feature importance
+varImpPlot(rf_model)
+
+```
+# Logistic Regression Model
+Out of all the models that I have created, this model is by far the best in accuracy. It has about a 79% accuracy. In the beggining the accuracy hovered around 80% to 90% but as I reduced the predictor variables in  my dataframe the accuracy lowered to my target rate of 70% to 80%. The model creates a logistic regression model using the training data and performs cross-validation to find the optimal value for the regularization parameter (lambda).
+It takes about 30 seconds or less to run.
+
+The sensitivity of the model is 0.7523, meaning that it correctly identifies 75% of the unprofitable customers, while the specificity is 0.8445, meaning that it correctly identifies 84% of the profitable customers.
+```{r}
+library(glmnet)
+
+set.seed(123)
+trainIndex <- createDataPartition(df$PROFITABLE, p = .7, 
+                                   list = FALSE, 
+                                   times = 1)
+trainData <- df[ trainIndex,]
+testData <- df[-trainIndex,]
+
+x <- model.matrix(PROFITABLE ~ ., data = trainData)[,-1]
+y <- as.numeric(trainData$PROFITABLE) - 1
+
+cv_fit <- cv.glmnet(x, y, family = "binomial", alpha = 1, nfolds = 20)
+
+lambda_opt <- cv_fit$lambda.min
+coef_opt <- coef(cv_fit, s = lambda_opt)
+
+# use the coefficients to make predictions on the test data
+x_test <- model.matrix(PROFITABLE ~ ., data = testData)[,-1]
+y_pred <- predict(cv_fit, newx = x_test, s = lambda_opt, type = "response")
+
+# convert the predictions to binary
+y_pred_class <- ifelse(y_pred > 0.5, 1, 0)
+
+# evaluate the model performance
+confusionMatrix(table(y_pred_class, testData$PROFITABLE))
+
+```
+# Classification Model
+I tried to run a classification model to predict whether the company will be profitable based on the predictor variables but the accuracy is still too high and the model too overfitted. 
+```{r}
+library(rpart)
+set.seed(123)
+trainIndex <- createDataPartition(df$PROFITABLE, p = .7, 
+                                   list = FALSE, 
+                                   times = 1)
+trainData <- df[ trainIndex,]
+testData <- df[-trainIndex,]
+
+tree_model <- rpart(PROFITABLE ~ ., data = trainData, method = "class",
+                    maxdepth = 2, minsplit = 10, cp = 0.001)
+
+tree_pred <- predict(tree_model, newdata = testData, type = "class")
+
+# evaluate the model performance
+confusionMatrix(table(tree_pred, testData$PROFITABLE))
+
+```
+# xgboost on PROFITABLE
+The model is used to make predictions on the test data, and the predictions are converted to binary format. The performance of the model is evaluated using a confusion matrix, which provides information on the accuracy of the model predictions, including the number of true positives, true negatives, false positives, and false negatives. However, like the previous models, the accuracy is too high and too overfitted to be of any use.
+```{r}
+
+library(xgboost)
+
+set.seed(123)
+trainIndex <- createDataPartition(df$PROFITABLE, p = .7, 
+                                   list = FALSE, 
+                                   times = 1)
+trainData <- df[ trainIndex,]
+testData <- df[-trainIndex,]
+
+trainData$PROFITABLE <- as.numeric(trainData$PROFITABLE) - 1
+testData$PROFITABLE <- as.numeric(testData$PROFITABLE) - 1
+
+dtrain <- xgb.DMatrix(as.matrix(trainData[,-6]), label = trainData$PROFITABLE)
+dtest <- xgb.DMatrix(as.matrix(testData[,-6]), label = testData$PROFITABLE)
+
+params <- list(
+  objective = "binary:logistic",
+  eval_metric = "logloss",
+  max_depth = 3,
+  eta = 0.3,
+  subsample = 0.8,
+  colsample_bytree = 0.8,
+  seed = 123
+)
+
+xgb_model <- xgb.train(params = params, data = dtrain, nrounds = 100)
+
+xgb_pred <- predict(xgb_model, dtest)
+xgb_pred <- ifelse(xgb_pred > 0.5, 1, 0)
+
+# evaluate the model performance
+confusionMatrix(table(xgb_pred, testData$PROFITABLE))
+
+```
+# xgboost on TOTAL_PROFIT as the target variable
+This model trains an XGBoost model on the training set and evaluates its performance on the test set. By selecting specific predictors, the model predicts the “TOTAL_PROFIT”. The model’s performance is evaluated using metrics such as mean squared error (MSE), root mean squared error (RMSE), and R-squared.
+
+Typically, a lower MSE and RMSE are better indicators of model performance, while a higher R-squared value indicates a better fit of the model to the data. However, I belive that this model is overfitted as well. Therefore, optimizing the model’s hyper parameters can lead to improved performance metrics.
+
+This xgboost takes less than 30 seconds to run
+```{r}
+# Split data into training and test sets
+set.seed(123)
+train_index <- createDataPartition(df_team$TOTAL_PROFIT, p = 0.7, list = FALSE)
+train_data <- df_team[train_index, ]
+test_data <- df_team[-train_index, ]
+
+# Define predictor and response variables
+predictors <- c("UNIQUE_PRODUCTS", "EXPECTED_TRANS_YEAR", "years_diff", "longetivity","location_Cluster","profitclvt")
+response <- "TOTAL_PROFIT"
+x_train <- train_data[, predictors]
+y_train <- train_data[, response]
+x_test <- test_data[, predictors]
+y_test <- test_data[, response]
+
+# Train XGBoost model
+xgb_model <- xgboost(data = as.matrix(x_train), label = y_train, nrounds = 10, objective = "reg:squarederror")
+
+# Make predictions on test set
+y_pred <- predict(xgb_model, as.matrix(x_test))
+
+# Evaluate model performance
+mse <- mean((y_pred - y_test)^2)
+rmse <- sqrt(mse)
+r_squared <- cor(y_pred, y_test)^2
+cat("MSE:", mse, "\n")
+cat("RMSE:", rmse, "\n")
+cat("R-squared:", r_squared, "\n")
+
+importance_matrix <- xgb.importance(names(x_train), model = xgb_model)
+print(importance_matrix)
+```
+
+# Model Performance and Multiple Regression Model Training
+This model used to fit a linear regression model to predict the “TOTAL_PROFIT” target variable based on other variables including “EXPECTED_TRANS_YEAR”, “UNIQUE_PRODUCTS”, “TOTAL_VOLUME”, “longevity”, “ACTIVE”, and “CUSTOMER_ACTIVITY_CLUSTER_DESCRIPTION”.
+
+The results of the model can be used to understand the relationship between the dependent variable Total_Profit and the independent variables.
+
+The p-values indicate whether each independent variable is significantly associated with Total_Profit, based on a hypothesis test with a significance level of 0.05. The R-squared value indicates the proportion of variance in Total_Profit that is explained by the model.
+
+This Multiple Regression Model takes about 45 or so seconds to run
+```{r}
+set.seed(1234)
+datasplit <- createDataPartition(df_team$ACTIVE, p = 0.7,list=FALSE)
+trainData <- df_team[datasplit,]
+testData <- df_team[-datasplit,]
+
+lmregression <- train(TOTAL_PROFIT ~ EXPECTED_TRANS_YEAR + UNIQUE_PRODUCTS  + longetivity + ACTIVE, data = trainData, method = "lm")
+
+summary(lmregression)
+```
+
+```{r}
+predictions <-predict(lmregression, newdata=testData)
+postResample(predictions, testData$TOTAL_PROFIT)
+```
+
+# Cross Validation
+Out of all the rsquared results that I have received on the previous models, this provides the least, if not the best rsquared results. Most of the models have been over fitted or close to overfit. Though the range is lower than I would have liked (usually between the 80 to 70 range) I believe 0.68 rsquared is an improvement in rsquared values compared to previous models.
+```{r}
+library(caret)
+
+# Define the training control with k-fold cross-validation
+ctrl <- trainControl(method = "cv", number = 5)
+
+# Fit the linear regression model with k-fold cross-validation
+lmregression <- train(TOTAL_PROFIT ~EXPECTED_TRANS_YEAR + UNIQUE_PRODUCTS + TOTAL_VOLUME + longetivity + ACTIVE + CUSTOMER_ACTIVITY_CLUSTER_DESCRIPTION, 
+                      data = trainData, 
+                      method = "lm", 
+                      trControl = ctrl)
+
+# Print the cross-validation results
+print(lmregression)
+```
+
+```{r}
+library(caret)
+
+# Define tuning grid
+ridgeGrid <- expand.grid(.lambda = c(0.01, 0.1, 1, 10))
+
+# Train the model using 10-fold cross-validation
+ridgeModel <- train(TOTAL_PROFIT ~ EXPECTED_TRANS_YEAR + UNIQUE_PRODUCTS + TOTAL_VOLUME + longetivity + ACTIVE + CUSTOMER_ACTIVITY_CLUSTER_DESCRIPTION, 
+                    data = trainData, 
+                    method = "ridge", 
+                    trControl = trainControl(method = "cv", number = 10), 
+                    tuneGrid = ridgeGrid)
+
+# Print the best model's RMSE
+ridgeModel$results
+```
+
+# Model selection
+To settle on the best model, I compared the performance metrics of both the XGBoost model(TOTAL_PROFIT and PROFITABLE), linear regression, random forest and classification. The performance metrics used for model comparison were mean squared error (MSE), root mean squared error (RMSE), and R-squared as well as accuracy.
+
+Based on the results obtained, the least overfitted model was the logistic regression on PROFITABLE with an output of 0.79. I believe that this is the best model in trying to understand whether the customer will have a total profit above the median threshold. 
+
+After analyzing the results, it was determined that the logistic regression model was the most suitable for predicting customer profitability. As a result, this model was selected as the final option for future use.
+
+# Summary
+Based on the business problem, Swire Coca-Cola is interested in predicting the profitability and success of new and current customers to make informed decisions on pricing and funding. The goal is to identify profitable customer segments and factors that contribute towards their success while minimizing risk factors for Swire.
+
+The logistic regression model on PROFITABLE is the least overfitted model with an output of 0.79. This means that the model has an accuracy of 79%, which is a relatively good performance. The model can be used to predict whether a customer will have a total profit above the median threshold, which can help Swire Coca-Cola make informed decisions on pricing and funding.
+
+By using historical data and machine learning techniques, Swire Coca-Cola can gain insights into the demands for each product and different customer segments. The findings regarding customer profitability and risk factors can help Swire Coca-Cola identify areas for improvement and optimize their business strategy.
+
+Overall, I believe that the logistic regression model on PROFITABLE is a valuable tool for Swire Coca-Cola to predict the profitability of new and current customers and make informed decisions on pricing and funding.
+
+# Business Validation of the model
+One way to validate this model is to use Swire’s historical data to assess the model’s predictive accuracy. This involves comparing the model’s predicted outcomes with the actual outcomes observed in the historical data. If the model’s predictions align with the actual outcomes, this provides evidence that the model is effective in predicting customer profitability and success.
+
+In the near future, I hope to add a classification model to predict the profitability and success of new local B2B restaurants and the profitability and risk factor of current customers to make informed decisions on pricing, area targeting and discounts.
+
+
+
