@@ -1,3 +1,4 @@
+![Header](https://github.com/ajgonza/Capstone-Project/blob/5cdbc3feaa2379155c2b95ba826f3c5e344b678e/Screenshot_20230129_104746.png)
 # Customer success
 By: 
 [Addison Faber](https://github.com/addyb0y) \
@@ -14,6 +15,9 @@ Swire Coca-Cola is seeking to improve its ability to predict the success of new 
 ## Exploratory Data Analysis (EDA)
 
 The EDA notebook [link to notebook here](EDA_Swire_coca_cola.html) explores the dataset and provides insights into the distribution of the features, the correlation between the features, and the target variable. The notebook also includes visualizations to help understand the data.
+
+After EDA we decide to create a categorical variable to determine the risk of a customer if it's profit in 3 years is lower 1070 is high risk or if its tenure is les than three years and havent ordered in the past 3 months.
+![Succes variable](https://github.com/ajgonza/Capstone-Project/blob/2cc6d1f76b59269cc7a2a1d5fbb3c3b7e8eca019/target%20variable.png)
 
 ## Modeling
 
