@@ -15,7 +15,8 @@ The EDA notebook [link to notebook here](EDA_Swire_coca_cola.html) explores the 
 
 The modeling notebook [link to notebook here]() presents the machine learning pipeline used to train and evaluate the model. The pipeline includes data preprocessing, feature engineering, model selection, hyperparameter tuning, and evaluation metrics. The notebook also discusses the performance of the model and provides recommendations for improving the model.
 
-##External Data
+## External Data
+
 The project uses data from Yelp and the United States Census Bureau. The Yelp data was obtained using the Yelp API, and the Census data was obtained from the Census website.this is found on [link to notebook here](Modeling-Assignment-Using-H2O-AutoML_Final_Stephen_Smart.html)
 
 ## Slides Presentation
