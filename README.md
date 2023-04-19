@@ -8,7 +8,51 @@ By:
 Swire Coca-Cola is seeking to improve its ability to predict the success of new restaurants in its market. To achieve this goal, we will analyze census data, consumer reviews, customer attributes, and Swire's sales to these customers. The data will be used to build a predictive model that can estimate the success of new customers based on historical results. The project will deliver a predictive model, a report on the methodology and results, a software implementation of the model, training and support for stakeholders on how to use and interpret the results, and a live presentation to showcase the findings and explain the methodology and results. 
 
 ## Problem Statement
+Swire Coca-Cola is struggling to systematically identify the success, profitability, and sales of potential B2B customers. The investment of time, capital, and operating expenses are at risk. Depending on the perceived profitability of the potential customer, Swire can adjust pricing and operational support to make their bid more attractive.
 
+Offering competitive bids to a company that eventually fails will cause a significant loss of investment.
+
+The purpose of this project is to identify and determine two factors:
+
+1) Predict which B2B customer will be successful (exceed the break-even point)
+
+2) How successful a specific customer will be (projected sales)
+
+Success Metrics. How will stakeholders judge whether the project was a success?
+
+Success will be determined by two metrics:
+
+1) How well the utilized analytical models can identify the two factors listed above for both of the following:
+
+a. Current customers
+
+b. New or future customers
+
+2) By determining major contributing factors relating to a B2B customer’s success that may have been unknown by previous contributors and stakeholders alike.
+
+The analytical methods that will be utilized for this project are:
+
+1) Data cleaning and exploration
+
+2) Deployment of predictive model(s) to determine success
+
+3) Supporting/exploratory visualizations
+
+4) Report creation and execution
+
+The current project will provide deliverables along with a select number of predictive models (example if a classification model is deployed only one will be created and tested) and supporting material in a report format. The focus will only be on B2B clients and not B2C.
+
+Future projects could include additional analytical models and testing. The project will be finished by early April 2023. Each of the four points above will be achieved approximately every 2 weeks from the creation of this business problem statement.
+
+Recommendations And Analysis
+
+It is our theory that by utilizing feature engineering and clustering, Swire should be able to build their own regression/classification models to predict profit, transactions, overall risk, and customer lifetime value more accurately.
+
+Due to the disparate geographical nature between Swire’s B2B Partners, as well as the strong contributing factor location has on a business’s success, building any model based off of the entire dataset is futile.
+
+The main argument of our theory is that a cluster (or specific location) containing current B2B Partners will be able to better contribute to the accurate prediction of a potential B2B Partner that Swire is vetting out. If ABC Business is being evaluated by Swire, we can draw on the current knowledge of the cluster to understand if the potential B2B partner, let's say a restaurant, is a good fit for the area. We would compare census data of the area or cluster in question against Coke's target customers or demographics for that area. Next, utilizing Yelp data to understand how well similar current B2B Partners are performing, such as similar restaurants, along with the performance of all restaurants in the area to evaluate general performance. The final piece is evaluating the current B2B Partners’ wait times from Google Analytics. A variety of metrics can be used from Google to understand, overall, how busy and therefore successful a current B2B Partner is. The hypothesis is that the longer the wait times, the busier the Partner is and the more revenue the Partner is generating.
+
+Overall, the more successful a Current and Potential B2B Partner is predicted to be the more likely Coca-Cola’s sales will be higher. Sales are directly related to customer traffic and perception of the Current and Potential B2B Partner. Therefore, we can sufficiently conclude that predicting the overall success of the B2B Partners will help us to better predict profit, transactions, overall risk, and even customer lifetime value for Swire Coca-Cola.
 
 
 ## Exploratory Data Analysis (EDA)
