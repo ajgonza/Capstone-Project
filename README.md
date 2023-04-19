@@ -19,6 +19,8 @@ The modeling notebook [link to notebook here]() presents the machine learning pi
 
 The project uses data from the United States Census Bureau provided via the [tidycensus](https://walker-data.com/tidycensus/) package. The heatmap displaying the 10 most important variables on TOTAL_PROFIT can be found [here](census_var_imp.png). Please refer to the presentation for variable definitions.
 
+![Heatmap](http://url/to/img.png)
+
 ## Slides Presentation
 [link to notebook here](Customer_success_slides.pdf)
 
