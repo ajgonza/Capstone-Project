@@ -19,7 +19,7 @@ The modeling notebook [link to notebook here](Modeling_Alvaro_Gonzalez.html) or 
 
 The project uses data from the United States Census Bureau provided via the [tidycensus](https://walker-data.com/tidycensus/) package. The heatmap displaying the 10 most important variables on TOTAL_PROFIT can be found [here](census_var_imp.png). Please refer to the presentation for variable definitions.
 
-![Heatmap](http://url/to/img.png)
+![Heatmap]([https://github.com/[username]/[reponame]/blob/[branch]/image.jpg](https://github.com/ajgonza/Capstone-Project/blob/80595edbe1691d3f02beb7e9e3f5fecafafc9928/census_var_imp.png)?raw=true)
 
 ## Slides Presentation
 [link to notebook here](Customer_success_slides.pdf)
