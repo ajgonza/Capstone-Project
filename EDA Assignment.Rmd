@@ -1,0 +1,273 @@
+---
+title: "EDA Assignment"
+author: "Stephen Smart"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width=14, fig.height=12) 
+```
+
+```{r, warning=FALSE}
+library(tidyverse)
+library(readxl)
+library(DataExplorer)
+library(gt)
+library(ggfortify)
+```
+
+```{r}
+sales <- read_excel("C:\\Users\\Stephen Smart\\Downloads\\FSOP_Sales_Data_v2.0.xlsx")
+customer <- read_excel("C:\\Users\\Stephen Smart\\Downloads\\FSOP_Customer_Data_v2.0.xlsx")
+sales_dict <- read_excel("C:\\Users\\Stephen Smart\\Downloads\\Data Dictionary.xlsx", 
+                       sheet = "Sales")
+customer_dict <- read_excel("C:\\Users\\Stephen Smart\\Downloads\\Data Dictionary.xlsx", 
+                       sheet = "Customer")
+```
+
+```{r}
+data_list <- list(customer, sales)
+names(data_list) <- c("customer", "sales")
+plot_str(data_list)
+```
+
+```{r}
+customer_dict[,1:2] %>% gt()
+```
+
+```{r}
+sales_dict[,1:2] %>% gt()
+```
+
+# Business Problem & Analytics Objective
+
+Around 10 % of Swire Coca-Cola's business is B2B. With each new customer that Swire brings, they must determine how profitable their business will be. Depending on a customer's profitability, Swire can offer discounts on products that will entice the customer to choose Coca-Cola products over other beverage brands. Offering discounts can put Swire in an advantageous position to win customers' business and earn their loyalty. However, if Swire offers discounts to a company that ultimately fails, they risk losing its investment.
+
+The proposed project is to prevent instances where Swire offers discounts to risk-sensitive customers and instead offers discounts to customers who will thrive as a partner. To give Swire sales representatives more insight into which businesses will be the most successful, we will provide the following solutions:
+
+-   An analysis of which variables play the most prominent role in making a business succeed so that sales representatives can find these signals and leverage their expertise to pursue the customer.
+-   A predictive model that can tell how successful a business will be so that sales representatives can accurately measure a customer's success in deals where it may be challenging to determine how successful their business will be.
+
+The project will be delivered as a markdown document, with code and text explaining the results. The initial section of the report will contain exploratory data analysis, followed by the aforementioned variable analysis and predictive model. Our team may explore which products will most likely be purchased by a particular business vertical. Our team will present this project to the Coca-Cola Swire team on *April 19th, 2023*.
+
+# Questions
+
+-   Distribution
+
+    -   What is the distribution of sales for each beverage category?
+
+    -   What is the distribution of order volume?
+
+-   Summary Statistics
+
+    -   What is the average order value?
+
+-   Ranking
+
+    -   What packaging types are used the most in each beverage category?
+
+    -   Which distributions centers generate the most sales?
+
+-   General
+
+    -   What is the customer lifetime value?
+
+    -   What is the trend of sales over time?
+
+    -   What kind of businesses do each distribution center work with?
+
+# EDA
+
+## Introduction
+
+```{r, warning=FALSE}
+introduce_customer <- introduce(customer) %>%
+  gather(key = "variable", value = "customer") %>%
+  select(variable, customer)
+
+introduce_sales <- introduce(sales) %>%
+  gather(key = "variable", value = "sales") %>%
+  select(variable, sales)
+
+introduce_joined <- inner_join(introduce_customer, introduce_sales, by = "variable")
+
+introduce_joined %>% gt()
+
+plot_intro(customer, title = "Customer data information")
+plot_intro(sales, title = "Sales data information")
+```
+
+```{r}
+plot_missing(customer)
+plot_missing(sales)
+```
+
+## Distribution of discrete variables with less than 50 categories
+
+```{r}
+# For customer
+plot_bar(customer, nrow = 1, ncol = 1)
+```
+
+```{r}
+# For sales
+plot_bar(sales, nrow = 1, ncol = 1)
+```
+
+```{r}
+# For customer, showing SALES_OFFICE_DESCRIPTION and BUSINESS_TYPE_EXTENSION_DESCRIPTION broken down by CUSTOMER_ACTIVITY_CLUSTER_DESCRIPTION
+plot_bar(customer[,c("SALES_OFFICE_DESCRIPTION","BUSINESS_TYPE_EXTENSION_DESCRIPTION", "CUSTOMER_ACTIVITY_CLUSTER_DESCRIPTION")], nrow = 2, ncol = 2, by = "CUSTOMER_ACTIVITY_CLUSTER_DESCRIPTION")
+```
+
+```{r}
+# For Sales, BEV_CAT_DESC and CALORIE_CAT_DESC broken down by PACK_TYPE_DESC
+plot_bar(sales, nrow = 2, ncol = 2, by="PACK_TYPE_DESC")
+```
+
+## Setting columns as factors
+
+```{r}
+# If a column has 50 or less categories, set it as a factor.
+# If it has more than 50 categories, keep it as a character
+set_cols_as_factors <- function(df) {
+  for (col in names(df)) {
+    n_vals <- nlevels(factor(df[[col]]))
+    if (n_vals <= 50) {
+      df[[col]] <- factor(df[[col]])
+    }
+  }
+  return(df)
+}
+```
+
+```{r}
+customer <- set_cols_as_factors(customer)
+sales <- set_cols_as_factors(sales)
+```
+
+## Summary statistics for continuous variables
+
+```{r}
+# Summary statistics for Sales
+# Customer has no numerical columns (with the exception of latitude and longitude, which are not continuous variables)
+summary(select_if(sales, is.numeric))
+```
+```{r}
+# Summary statistics again, but removing negative values (or in this case, setting them to NA)
+sales %>% 
+  select_if(is.numeric) %>%
+  mutate_all(~ifelse(. < 0, NA, .)) %>%
+  summary()
+```
+## Distribution of order volume
+
+```{r}
+sales %>% 
+filter(PHYSICAL_VOLUME > 0) %>% # filtering out negative values (returns) and zeroes
+  ggplot(aes(PHYSICAL_VOLUME)) + 
+  geom_histogram() +
+  scale_x_log10() # using a log due to skewness in the data
+```
+
+
+## Plotting sales overtime
+
+```{r}
+ggplot(sales, aes(x=MIN_POSTING_DATE, y=PHYSICAL_VOLUME)) +
+  geom_line()
+```
+
+## Customer LTV
+
+> CLTV = (Average Purchase Value x Purchase Frequency x Customer Lifespan)
+
+```{r}
+# Calculating life time in months of a customer
+customer$LIFETIME_IN_MONTHS <- floor(as.numeric(difftime(Sys.Date(), customer$ON_BOARDING_DATE, units = "days")) / 30.44)
+```
+
+```{r}
+# Joining sales and customer
+customer_sales <- inner_join(customer, sales, by = "CUSTOMER_NUMBER_BLINDED")
+```
+
+```{r}
+# Creating the LTV table
+LTV <- customer_sales %>% 
+  group_by(CUSTOMER_NUMBER_BLINDED, CUSTOMER_TRADE_CHANNEL_DESCRIPTION) %>% 
+  summarise(avg_purchase_value = mean(DEAD_NET),
+            purchase_frequency = n(),
+            lifetime = LIFETIME_IN_MONTHS) %>% 
+  distinct()
+```
+```{r}
+head(LTV)
+```
+
+
+```{r}
+# CLTV = (Average Purchase Value x Purchase Frequency x Customer Lifespan)
+LTV$LTV <- LTV$avg_purchase_value * LTV$purchase_frequency * LTV$lifetime
+```
+
+
+```{r}
+head(LTV)
+```
+
+```{r}
+# Total Customer lifetime value
+sum(LTV$LTV)
+```
+```{r}
+# LTV by channel
+LTV_channel <- LTV %>% 
+  group_by(CUSTOMER_TRADE_CHANNEL_DESCRIPTION) %>%
+  summarise(count = n(),
+            total_LTV = sum(LTV)) %>%
+  arrange(desc(total_LTV))
+
+LTV_channel %>% gt()
+```
+
+```{r}
+ggplot(LTV_channel,aes(x = reorder(CUSTOMER_TRADE_CHANNEL_DESCRIPTION, -total_LTV), y = total_LTV)) +
+  geom_col(fill = "steelblue") +
+  coord_flip()
+```
+
+# Findings
+
+> What is the distribution of sales for each beverage category?
+
+CORE SPARKING appears to be the most popular category, which I assume pertains to almost all carbonated beverages. I expected ENERGY DRINKS to be popular, but I did not expect it to be the second most popular category.
+
+> What is the distribution of order volume?
+
+Order volume is significantly skewed towards a lot of PHYSICAL_VOLUME zero or negative orders. When we apply a log transformation, we can see that most of the PHYSICAL_VOLUME appears to be between 1 and 40.
+
+> What is the average order value?
+
+The average order value of a non-negative (return) or non-zero transaction is 879.8.
+
+> What packaging types are used the most in each beverage category?
+
+Beyond Core Sparkling, bottled water appears to have the most variety in types of packaging used
+
+> Which distributions centers generate the most sales?
+
+Draper, UT seems to drive the most sales.
+
+> What is the customer lifetime value?
+
+The overall lifetime value of all customers is 102821324681. The breakdown of lifetime value per customer and by channel is shown above.
+
+> What is the trend of sales over time?
+
+Sales seem to significantly increase for a period around the end of 2021, then continue to appear normal afterwards.
+
+> What kind of businesses do each distribution center work with?
+
+Each distribution center works with a variety of different businesses. Draper, UT, seems to do the most sales, while distribution centers like Logan, UT seem to do the most sales with other office settings businesses.

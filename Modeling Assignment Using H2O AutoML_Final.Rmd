@@ -1,0 +1,265 @@
+---
+title: "Modeling Assignment Using H2O AutoML"
+author: "Stephen Smart"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    theme: cosmo
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+The goal of this document is to provide a solution that can allow for Swire to predict the expected number of transactions per year for a given customer, where the expected number of transactions per year is:
+
+**Total transactions/max(maxdate)-min(mindate)**
+
+From there, the salesperson could take the predicted value and multiply it by [x] years to get a forecast.
+
+I wanted to focus on model usability, where the inputs could be completely derived using only information that we would know about the customer from the start.
+
+```{r, echo=FALSE}
+library(RPostgreSQL)
+library(tidyverse)
+library(tidymodels)
+library(rsample)
+library(janitor)
+library(bundle)
+library(glmnet)
+library(agua)
+library(vip)
+```
+
+```{r}
+set.seed(1)
+```
+
+# Data preparation
+
+To start, we first need to retrieve the data from the database. The following tables are in the database
+
+-   **customer** - Customer data provided by Swire.
+
+-   **customer_features** - Features that were engineered by my teammate Alvaro.
+
+-   **sales** - Sales data provided by Swire.
+
+-   **acs** - American Community Survey data pulled from the census api
+
+In this document, we will only be using, customer, and customer features, as customer contains all of the customer information, and customer features contains our target variable.
+
+The sales data is not needed, and was only used to derive features. The acs data set did not prove to be effective when using it to predict expected number of transactions per year.
+
+```{r, include=FALSE}
+# Connect to Azure Database for PostgreSQL
+drv <- dbDriver("PostgreSQL")
+con <- dbConnect(drv, dbname="postgres", host="capstonedb.postgres.database.azure.com",
+                 port="5432", user="capstone", password=read_lines("C:\\Users\\Stephen Smart\\Downloads\\secret.txt"))
+```
+
+```{r, echo = FALSE}
+# Loop through two table names
+for (t in c("customer", "customer_features")) {
+  # Print a message indicating which table is being queried
+  print(paste("Querying", t))
+  # Assign the result of a database query to a variable with the same name as the table
+  assign(t, dbGetQuery(conn = con, statement = paste("select * from", t)))
+}
+
+# Disconnect from the database
+dbDisconnect(con)
+
+# Remove the variables representing the database connection, table names and driver
+rm(con, t, drv)
+```
+
+As mentioned before, I wanted to only select variables that a salesperson would use if we were forecasting the expected number of transactions for a new customer.
+
+I am using the following variables in this model:
+
+-   **Predictors:**
+
+    -   CUSTOMER_TRADE_CHANNEL_DESCRIPTION - Type of store the customer falls under (Supermarket, College, etc.)
+
+    -   CUSTOMER_SUB_TRADE_CHANNEL_DESCRIPTION - More specific type of store the customer falls under (Chain Supermarket, Hardware, etc.)
+
+    -   ADDRESS_CITY - City in which the customer resides
+
+-   **Target:**
+
+    -   EXPECTED_TRANS_YEAR
+
+Other variables were previously tested, such as County, but they proved to show no impact on how many transactions a business makes a month.
+
+```{r, echo=FALSE}
+df <- customer %>%
+  select(CUSTOMER_NUMBER_BLINDED,
+         ADDRESS_CITY,
+         CUSTOMER_TRADE_CHANNEL_DESCRIPTION,
+         CUSTOMER_SUB_TRADE_CHANNEL_DESCRIPTION
+         ) %>%
+  inner_join(., select(customer_features, CUSTOMER_NUMBER_BLINDED, EXPECTED_TRANS_YEAR), by = "CUSTOMER_NUMBER_BLINDED") %>%
+  mutate_at(vars(CUSTOMER_TRADE_CHANNEL_DESCRIPTION, CUSTOMER_SUB_TRADE_CHANNEL_DESCRIPTION), factor) %>%
+  relocate(EXPECTED_TRANS_YEAR, 1) %>%
+  select(-CUSTOMER_NUMBER_BLINDED) %>% 
+  drop_na()
+```
+
+I then created a lasso regression model to provide insight on which trade channels were having the most influence on expected number of transactions per year. While not all channels are significant, we can see that some do show influence.
+
+```{r}
+x <- model.matrix(EXPECTED_TRANS_YEAR ~ ., data = df)[,-1]
+y <- df$EXPECTED_TRANS_YEAR
+fit <- cv.glmnet(x, y, alpha = 1)
+coef(fit)
+```
+
+I then create the train test split to be used for validation.
+
+```{r}
+# Split the 'df' data into training and testing sets
+set.seed(1)
+data_split <- initial_split(df, prop = 0.7)
+training_data <- training(data_split)
+testing_data <- testing(data_split)
+```
+
+# Modeling process
+
+For modeling, I will be using the auto_ml() function from h2o, which automates the following processes:
+
+-   **Candidate models** - By using auto_ml, we are able to work through a set of predetermined black-box models. Auto-ml will attempt to create the following:
+
+    -   Three pre-specified XGBoost GBM (Gradient Boosting Machine) models
+
+    -   A fixed grid of GLMs
+
+    -   A default Random Forest (DRF), five pre-specified H2O GBMs
+
+    -   A near-default Deep Neural Net, an Extremely Randomized Forest (XRT)
+
+    -   A near-default Deep Neural Net, an Extremely Randomized Forest (XRT)
+
+    -   A random grid of Deep Neural Nets
+
+-   **Model selection** - Once all models are finished running, auto_ml will rank the models by their specified performance metrics. We will select the best model based on RMSE. We'll also show the rankings for R2.
+
+-   **Cross validation** - By default, auto_ml uses 5 fold cross validation for each of its models.
+
+-   **Model tuning** - auto_ml uses grid search, random search, and Bayesian optimization for hyper parameter tuning in each model. In addition, auto_ml uses ensembles to combine the predictive performance of multiple models.
+
+-   **Model performance** - Predictions made with the best model are almost instant, but can scale in time depending on the size of the validation set, or new data. The most time consuming part of the model is running auto_ml. The run time of auto_ml can be specified by the user, but most will typically set it between 30 and 60 minutes.
+
+## Specifying the auto_ml process
+
+To facilitate the auto_ml process, we will be using the tidymodels workflow. This creates a procedural method for pre processing and modeling.
+
+The fitting modeling is done with a workflow object. A workflow object is made up of two separate objects:
+
+-   **Model** - This includes the engine to be used for making calculations, the modeling task (regression), and any other arguments for the specified engine.
+
+-   **Recipe** - The pre processing steps prior to running a model (ex. dummy variables, normalization), and the data to be used.
+
+Here, we're starting the h2o cluster, then creating the model. We set the engine (what is used to make calculations), the max run time that h2o will run models for, and the mode, which is regression.
+
+```{r}
+# Start H2O cluster
+h2o_start()
+
+auto_spec <- 
+  auto_ml() %>%  # Specify an automatic machine learning workflow
+  set_engine("h2o", max_runtime_secs = 1800, seed = 1) %>% # Use h2o as the modeling engine, set maximum runtime to 1800 seconds, and seed to 1
+  set_mode("regression") # Set the modeling task to regression
+```
+
+This is the recipe, where we set the formula, and the pre processing parameters. Since all the input variables are categorical, no pre processing is necessary outside of the factoring we did earlier.
+
+```{r}
+# Define a recipe object to specify the data preparation steps
+data_recipe <- 
+  recipe(EXPECTED_TRANS_YEAR ~ ., data = training_data)
+```
+
+We then combine our model with our recipe into a workflow
+
+```{r}
+auto_workflow <- workflow() %>% # Create a workflow object for the modeling process
+  add_recipe(data_recipe) %>% # Add the recipe object created in the previous step to the workflow
+  add_model(auto_spec) # Add the automated machine learning model specification object to the workflow
+```
+
+Once we have the workflow ready, we fit the model. **This part takes 30 minutes.**
+
+```{r}
+# Fit the AutoML workflow to the training data and store the resulting model in auto_fit
+auto_fit <- fit(auto_workflow, data = training_data)
+```
+
+The table below shows the ranking of the top performing models across all metrics.
+
+```{r}
+# Extract the model parameters from the AutoML model
+extract_fit_parsnip(auto_fit)
+```
+
+We then make predictions on the testing data using the best model. If we wanted to, we could specify a model id to make predictions using one of the other generated models
+
+```{r}
+# Use the AutoML model to make predictions on the testing data
+predict(auto_fit, testing_data)
+```
+
+This is a table ranking the models from best to worst in terms of RMSE.
+
+```{r}
+# Get the rank results of the AutoML model and pipe the results to the next function
+rank_results(auto_fit) %>%
+  # Filter the results to only include the metric "rmse"
+  filter(.metric == "rmse") %>%
+  # Arrange the results in ascending order of rank
+  arrange(rank)
+```
+
+This is a table ranking the models from best to worst in terms of R2.
+
+```{r}
+# Get the rank results of the AutoML model and pipe the results to the next function
+rank_results(auto_fit) %>%
+  # Filter the results to only include the metric "r2"
+  filter(.metric == "r2") %>%
+  # Arrange the results in ascending order of rank
+  arrange(rank)
+```
+
+The code below allows you to export the model to be used in different notebooks or R scripts.
+
+```{r}
+# auto_fit_bundle <- bundle(auto_fit)
+# saveRDS(auto_fit_bundle, file = "test.h2o.auto_fit.rds")
+```
+
+We can also see the distribution of how every type of model performed. Typically, stacked ensembles work the best.
+
+```{r}
+# Plot the performance of all types of AutoML models
+
+# Set the type of plot to "rank" and the metrics to be displayed to "mae" and "rmse"
+
+autoplot(auto_fit, type = "rank", metric = c("mae", "rmse")) +
+  # Remove the legend from the plot
+  theme(legend.position = "none")
+```
+
+# Results
+
+-   The top ranked model has an RMSE of 638, and an R2 of .17
+
+-   The overall top ranked model among all models was a stacked ensemble
+
+    Without being able to understand more information about the customer, it is difficult to frame this problem as a regression model. Even when we pull demographic information from the census, we still don't find any signals that directly affect a business' expected number of transactions per month. Sub channels like Pizza and Supermarket that appeared significant in the lasso model did not end up having strong predictions under the stacked ensemble model.
+
+    If I were to re-approach this problem again, I would make this a clustering model instead.
